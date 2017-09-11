@@ -9,7 +9,6 @@ import argparse
 import json
 import shutil
 import numpy as np
-import pdb
 
 from pprint import pprint
 
@@ -43,7 +42,6 @@ def change_dims_in_weights(h5_file):
     global nb_last_conv
     global first_dense
 
-    pdb.set_trace()
     layers = h5_file['model_weights']
 
     if 'training_config' in h5_file.attrs.keys():

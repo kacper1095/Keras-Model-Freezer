@@ -25,7 +25,6 @@ from google.protobuf import text_format
 from tensorflow.python.framework import graph_util
 from tensorflow.python.tools import optimize_for_inference
 
-import pdb
 import argparse
 import subprocess
 import tensorflow as tf
@@ -141,6 +140,15 @@ def freeze_graph(output_nodes_names, input_graph, input_checkpoint, output_path)
                         )
 
 
+def call_subprocess(args, msg=''):
+    printable = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    for line in printable.stdout.readlines():
+        print(line)
+    printable.wait()
+    if printable.returncode == 0:
+        print(msg)
+
+
 def main(args):
     print('Loading model and saving to tensorflow files')
     model = save_checkpoint_and_return_model(args.structure,
@@ -153,14 +161,9 @@ def main(args):
     freeze_graph(nodes, args.graph_txt, args.saver, args.output)
     if args.optimize:
         module_path = optimize_for_inference.__file__
-        printable = subprocess.Popen(['python', module_path, '--input=' + args.output, '--output=' + args.output,
-                                      '--frozen_graph=True', '--input_names=input_1', '--output_names=' + nodes],
-                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        for line in printable.stdout.readlines():
-            print(line)
-        return_code = printable.wait()
-        if printable.returncode == 0:
-            print('Succesfully optimized graph')
+        call_subprocess(['python', module_path, '--input=' + args.output, '--output=' + args.output,
+                         '--frozen_graph=True', '--input_names=input_1', '--output_names=' + nodes],
+                        msg='Successfully optimized graph')
 
 
 if __name__ == '__main__':
