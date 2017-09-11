@@ -24,7 +24,7 @@ def create_model():
     x = conv_bn(x, 32)
     x = Convolution2D(1, 1, 1, activation='sigmoid')(x)
     model = Model(input=input_tensor, output=x)
-    with open(os.path.join('sample_data', 'new.json'), 'w') as f:
+    with open(os.path.join('input', 'new.json'), 'w') as f:
         f.write(model.to_json())
 
 

@@ -10,11 +10,9 @@ import json
 import shutil
 import numpy as np
 import pdb
-import warnings
 
 from pprint import pprint
 
-SAMPLE_PATH = os.path.join('sample_data')
 OUTPUT = os.path.join('output')
 
 first_dense = True
