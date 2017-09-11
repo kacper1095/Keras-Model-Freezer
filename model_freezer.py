@@ -23,8 +23,11 @@ os.environ['KERAS_BACKEND'] = 'tensorflow'
 from keras.models import model_from_json
 from google.protobuf import text_format
 from tensorflow.python.framework import graph_util
+from tensorflow.python.tools import optimize_for_inference
 
+import pdb
 import argparse
+import subprocess
 import tensorflow as tf
 import keras.backend as K
 
@@ -37,6 +40,7 @@ def save_checkpoint_and_return_model(json_path, weights_path, ckpt_path, proto_t
     K.set_learning_phase(0)
     with open(json_path) as f:
         model = model_from_json(f.read())
+        model.summary()
     if weights_path != '' and weights_path is not None:
         model.load_weights(weights_path)
     else:
@@ -108,7 +112,7 @@ def freeze_graph_helper(input_graph, input_saver, input_binary, input_checkpoint
         for node in input_graph_def.node:
             inputs = node.input
             if any([name in node.name for name in illegal_names]) or \
-                any([il_name in inp_name for il_name in illegal_names for inp_name in inputs]):
+                    any([il_name in inp_name for il_name in illegal_names for inp_name in inputs]):
                 print(node.name)
                 continue
             whitelist_nodes.append(node.name)
@@ -127,7 +131,7 @@ def freeze_graph(output_nodes_names, input_graph, input_checkpoint, output_path)
     freeze_graph_helper(input_graph=input_graph,
                         input_checkpoint=input_checkpoint,
                         output_graph=output_path,
-                        output_node_names=','.join(output_nodes_names),
+                        output_node_names=output_nodes_names,
                         clear_devices=True,
                         input_saver='',
                         input_binary='',
@@ -143,10 +147,20 @@ def main(args):
                                              args.weights,
                                              args.saver,
                                              args.graph_txt)
-    nodes = get_output_nodes_names(model)
+    nodes = ','.join(get_output_nodes_names(model))
     print('Output nodes: ' + str(nodes))
     print('Freezing graph')
     freeze_graph(nodes, args.graph_txt, args.saver, args.output)
+    if args.optimize:
+        module_path = optimize_for_inference.__file__
+        printable = subprocess.Popen(['python', module_path, '--input=' + args.output, '--output=' + args.output,
+                                      '--frozen_graph=True', '--input_names=input_1', '--output_names=' + nodes],
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        for line in printable.stdout.readlines():
+            print(line)
+        return_code = printable.wait()
+        if printable.returncode == 0:
+            print('Succesfully optimized graph')
 
 
 if __name__ == '__main__':
@@ -161,5 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--graph_txt', default='output/model.pbtxt',
                         help='Path of intermidiate prototxt graph definition to save')
     parser.add_argument('--output', default='output/graph.pb', help='Path of output file after freeze')
+    parser.add_argument('--optimize', default=False, help='Optimize graph using tensorflow built in utility',
+                        action='store_true')
     args = parser.parse_args()
     main(args)
