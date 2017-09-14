@@ -150,6 +150,8 @@ def call_subprocess(args, msg=''):
 
 
 def main(args):
+    if args.optimize and (args.input_names == '' or args.input_names is None):
+        raise ValueError('If you want to optimize you have to insert inputs names of graph')
     print('Loading model and saving to tensorflow files')
     model = save_checkpoint_and_return_model(args.structure,
                                              args.weights,
@@ -162,7 +164,7 @@ def main(args):
     if args.optimize:
         module_path = optimize_for_inference.__file__
         call_subprocess(['python', module_path, '--input=' + args.output, '--output=' + args.output,
-                         '--frozen_graph=True', '--input_names=input_1', '--output_names=' + nodes],
+                         '--frozen_graph=True', '--input_names=' + args.input_names, '--output_names=' + nodes],
                         msg='Successfully optimized graph')
 
 
@@ -180,5 +182,6 @@ if __name__ == '__main__':
     parser.add_argument('--output', default='output/graph.pb', help='Path of output file after freeze')
     parser.add_argument('--optimize', default=False, help='Optimize graph using tensorflow built in utility',
                         action='store_true')
+    parser.add_argument('--input_names', default='', help='Inputs names for graph to optimize, comma separated')
     args = parser.parse_args()
     main(args)
