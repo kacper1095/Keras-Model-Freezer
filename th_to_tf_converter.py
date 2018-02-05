@@ -1,5 +1,5 @@
 """
-Sample usage: python th_to_tf_converter.py -j sample_data/architecture.json -w sample_data/weights.h5
+Sample usage: python th_to_tf_converter.py -j sample_data/architecture.json -w sample_data/weights.h5 -c -o
 """
 
 
@@ -12,19 +12,22 @@ import numpy as np
 
 from pprint import pprint
 
+DEBUG = False
 OUTPUT = os.path.join('output')
 
 first_dense = True
 nb_last_conv = 0
 
 
-def convert_weight_model_files(weights_file_name='', json_file_name='', clear=False):
-    if not os.path.exists(OUTPUT):
-        os.makedirs(OUTPUT)
+def convert_weight_model_files(weights_file_name='', json_file_name='', clear=False, output_folder_path=''):
+    if output_folder_path is None or output_folder_path == '':
+        output_folder_path = OUTPUT
+    if not os.path.exists(output_folder_path):
+        os.makedirs(output_folder_path)
     if weights_file_name != '' and weights_file_name is not None:
         print('converting h5')
-        shutil.copyfile(os.path.join(weights_file_name), os.path.join(OUTPUT, os.path.basename(weights_file_name)))
-        h5_file = h5py.File(os.path.join(OUTPUT, os.path.basename(weights_file_name)), mode='r+')
+        shutil.copyfile(os.path.join(weights_file_name), os.path.join(output_folder_path, os.path.basename(weights_file_name)))
+        h5_file = h5py.File(os.path.join(output_folder_path, os.path.basename(weights_file_name)), mode='r+')
         if clear:
             del h5_file['optimizer_weights']
         change_dims_in_weights(h5_file)
@@ -34,7 +37,7 @@ def convert_weight_model_files(weights_file_name='', json_file_name='', clear=Fa
         with open(os.path.join(json_file_name)) as f:
             json_file = json.load(f)
         change_dims_in_structure(json_file)
-        save_file_json(json_file, json_file_name)
+        save_file_json(output_folder_path, json_file, json_file_name)
     print('done')
 
 
@@ -48,7 +51,7 @@ def change_dims_in_weights(h5_file):
         del h5_file.attrs['training_config']
 
     if 'model_config' in h5_file.attrs.keys():
-        h5_file.attrs['model_config'] = json.dumps(change_dims_in_structure(json.loads(h5_file.attrs['model_config']), debug_print=True))
+        h5_file.attrs['model_config'] = json.dumps(change_dims_in_structure(json.loads(h5_file.attrs['model_config']), debug_print=DEBUG))
 
     nb_of_dense = count_denses(h5_file)
     if nb_of_dense == 1:
@@ -56,25 +59,36 @@ def change_dims_in_weights(h5_file):
 
     for layer_key in layers.keys():
         transform_weights(layers, layer_key, '_W')
+        transform_weights(layers, layer_key, 'param_0')
+        transform_weights(layers, layer_key, '_b')
         transform_weights(layers, layer_key, '_alphas')
+        transform_weights(layers, layer_key, '_beta')
+        transform_weights(layers, layer_key, '_gamma')
+        transform_weights(layers, layer_key, '_running_mean')
+        transform_weights(layers, layer_key, '_running_std')
 
 
 def transform_weights(layers, layer_key, suffix):
     global first_dense
     global nb_last_conv
 
-    layer_weights_key = layer_key + suffix
-    if layer_weights_key in layers[layer_key].keys():
+    if suffix != 'param_0':
+        layer_weights_key = layer_key + suffix
+    else:
+        layer_weights_key = suffix
+    if layer_weights_key in list(layers[layer_key].keys()):
         weights = layers[layer_key][layer_weights_key][:]
+        print(layer_weights_key, weights.shape)
         if len(weights.shape) == 4:
             weights = weights.transpose((2, 3, 1, 0))
-        if len(weights.shape) == 3:
+        elif len(weights.shape) == 3:
             weights = weights.transpose((1, 2, 0))
             print(weights.shape)
         elif len(weights.shape) == 2 and first_dense:
             nb_rows_dense_layer = weights.shape[0]
             weights = shuffle_rows(weights, nb_last_conv, nb_rows_dense_layer)
             first_dense = False
+        # print(weights.shape[-1])
         nb_last_conv = weights.shape[-1]
         del layers[layer_key][layer_weights_key]
         layers[layer_key].create_dataset(layer_weights_key, data=weights)
@@ -82,19 +96,18 @@ def transform_weights(layers, layer_key, suffix):
 
 def shuffle_rows(original_w, nb_last_conv, nb_rows_dense):
     """
-        Note :
-        This algorithm to shuffle dense layer rows was provided by Kent Sommers (@kentsommer)
-        in a gist : https://gist.github.com/kentsommer/e872f65926f1a607b94c2b464a63d0d3
-        """
+    Note :
+    This algorithm to shuffle dense layer rows was provided by Kent Sommers (@kentsommer)
+    in a gist : https://gist.github.com/kentsommer/e872f65926f1a607b94c2b464a63d0d3
+    """
     converted_w = np.zeros(original_w.shape)
     count = 0
-    for index in range(original_w.shape[0]):
+    for index, row in enumerate(original_w):
         if (index % nb_last_conv) == 0 and index != 0:
             count += 1
-        new_index = ((index % nb_last_conv) * nb_rows_dense) + count
+        new_index = ((index % nb_last_conv) * int(nb_rows_dense / nb_last_conv)) + count
         print("index from " + str(index) + " -> " + str(new_index))
-        converted_w[index] = original_w[new_index]
-
+        converted_w[new_index] = row
     return converted_w
 
 
@@ -110,10 +123,9 @@ def count_denses(h5_file):
     return result
 
 
-def change_dims_in_structure(json_file, depth=1, debug_print=False):
+def change_dims_in_structure(json_file, debug_print=False):
     if json_file is None or json_file == {} or json_file == []:
         return
-    print(depth)
     layers = json_file['config']['layers']
     for layer in layers:
         if layer['class_name'] == 'InputLayer':
@@ -139,8 +151,8 @@ def change_dims_in_place(dim_ordering):
     dim_ordering[1:3], dim_ordering[3] = dim_ordering[2:4], dim_ordering[1]
 
 
-def save_file_json(json_file, json_file_name):
-    with open(os.path.join(OUTPUT, os.path.basename(json_file_name)), 'w') as f:
+def save_file_json(output_folder, json_file, json_file_name):
+    with open(os.path.join(output_folder, os.path.basename(json_file_name)), 'w') as f:
         json.dump(json_file, f)
 
 
@@ -150,5 +162,6 @@ if __name__ == '__main__':
     ap.add_argument('-w', '--weights', default='', help='File name of weights (include h5 extension)')
     ap.add_argument('-j', '--json', default='', help='File name of structure (include json extension)')
     ap.add_argument('-c', '--clear', help='Clear keras compiled data, like optimizer and loss function', action='store_true')
+    ap.add_argument('-o', '--output', help='Output folder path')
     args = ap.parse_args()
-    convert_weight_model_files(args.weights, args.json, args.clear)
+    convert_weight_model_files(args.weights, args.json, args.clear, args.output)

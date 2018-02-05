@@ -24,14 +24,23 @@ from keras.models import model_from_json
 from google.protobuf import text_format
 from tensorflow.python.framework import graph_util
 from tensorflow.python.tools import optimize_for_inference
+from keras import initializations
 
 import argparse
 import subprocess
 import tensorflow as tf
 import keras.backend as K
+import numpy as np
 
 K.set_image_dim_ordering('tf')
 OUTPUT_PATH = os.path.join('output')
+
+
+def normal_initialization(shape, scale=0.01, dtype=None, **kwargs):
+    return K.variable(np.random.normal(scale=scale, size=shape), dtype=dtype)
+
+
+setattr(initializations, 'normal_initialization', normal_initialization)
 
 
 def save_checkpoint_and_return_model(json_path, weights_path, ckpt_path, proto_txt):
@@ -83,7 +92,7 @@ def freeze_graph_helper(input_graph, input_saver, input_binary, input_checkpoint
         if input_binary:
             input_graph_def.ParseFromString(f.read())
         else:
-            text_format.Merge(f.read().decode("utf-8"), input_graph_def)
+            text_format.Merge(f.read(), input_graph_def)
     # Remove all the explicit device specifications for this node. This helps to
     # make the graph more portable.
     if clear_devices:
