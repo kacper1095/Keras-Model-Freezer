@@ -166,4 +166,4 @@ venv.bak/
 /output/*
 /sample_data/*
 /input/*
-
+/models
