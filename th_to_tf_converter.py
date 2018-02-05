@@ -1,5 +1,7 @@
 """
 Sample usage: python th_to_tf_converter.py -j sample_data/architecture.json -w sample_data/weights.h5 -c -o
+You can modify script to match more names. Care of convention that standard naming is using 'layer_name' + '_suffix'.
+Without floor it is supposed to be a singular name, without layer name at the beginning.
 """
 
 
@@ -72,7 +74,7 @@ def transform_weights(layers, layer_key, suffix):
     global first_dense
     global nb_last_conv
 
-    if suffix != 'param_0':
+    if suffix.startswith('_'):
         layer_weights_key = layer_key + suffix
     else:
         layer_weights_key = suffix
