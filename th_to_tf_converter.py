@@ -113,7 +113,7 @@ def count_denses(h5_file):
 def change_dims_in_structure(json_file, depth=1, debug_print=False):
     if json_file is None or json_file == {} or json_file == []:
         return
-    print depth
+    print(depth)
     layers = json_file['config']['layers']
     for layer in layers:
         if layer['class_name'] == 'InputLayer':

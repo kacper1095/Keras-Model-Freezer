@@ -163,6 +163,7 @@ venv.bak/
 
 # End of https://www.gitignore.io/api/python,pycharm+all
 
-output/*
-sample_data/*
-input/*
+/output/*
+/sample_data/*
+/input/*
+
