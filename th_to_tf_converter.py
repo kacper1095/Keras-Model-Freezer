@@ -6,11 +6,16 @@ Without floor it is supposed to be a singular name, without layer name at the be
 
 
 import os
+os.environ['KERAS_BACKEND'] = 'theano'
+
 import h5py
 import argparse
 import json
 import shutil
 import numpy as np
+import keras.backend as K
+
+K.set_image_dim_ordering('th')
 
 from pprint import pprint
 
@@ -30,7 +35,7 @@ def convert_weight_model_files(weights_file_name='', json_file_name='', clear=Fa
         print('converting h5')
         shutil.copyfile(os.path.join(weights_file_name), os.path.join(output_folder_path, os.path.basename(weights_file_name)))
         h5_file = h5py.File(os.path.join(output_folder_path, os.path.basename(weights_file_name)), mode='r+')
-        if clear:
+        if clear and "optimizer_weigths" in h5_file.keys():
             del h5_file['optimizer_weights']
         change_dims_in_weights(h5_file)
         h5_file.close()
@@ -47,7 +52,10 @@ def change_dims_in_weights(h5_file):
     global nb_last_conv
     global first_dense
 
-    layers = h5_file['model_weights']
+    if 'model_weights' in h5_file.keys():
+        layers = h5_file['model_weights']
+    else:
+        layers = h5_file
 
     if 'training_config' in h5_file.attrs.keys():
         del h5_file.attrs['training_config']
@@ -115,7 +123,10 @@ def shuffle_rows(original_w, nb_last_conv, nb_rows_dense):
 
 def count_denses(h5_file):
     result = 0
-    layers = h5_file['model_weights']
+    if 'model_weights' in h5_file.keys():
+        layers = h5_file['model_weights']
+    else:
+        layers = h5_file
     for layer_key in layers.keys():
         layer_weights_key = layer_key + '_W'
         if layer_weights_key in layers[layer_key].keys():
@@ -139,7 +150,11 @@ def change_dims_in_structure(json_file, debug_print=False):
         if 'output_shape' in layer['config'].keys():
             output_dims = layer['config']['output_shape']
             if output_dims is not None:
-                change_dims_in_place(output_dims)
+                try:
+                    change_dims_in_place(output_dims)
+                except IndexError as e:
+                    print(e)
+                    continue
         if 'concat_axis' in layer['config'].keys():
             layer['config']['concat_axis'] = 3
         if 'dim_ordering' in layer['config'].keys():
