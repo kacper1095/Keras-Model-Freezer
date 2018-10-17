@@ -45,3 +45,5 @@ python optimize_for_inference.py --input <input_graph_path.pb> --output <output_
     ...
     ```
     In this case, `Sigmoid` is our output node name 
+3) Naming nodes:
+- if you finally found your nodes' names, then to get nodes themselves by name you have to call method on `tf.Graph` object `get_tensor_by_name(<name>)` where `<name>` should be written as `import/<found_node_name>:0`
