@@ -32,7 +32,7 @@ def convert(weights, output, json_file=''):
     op_names = [op.name for op in graph.get_operations()]
 
     saver.save(session, os.path.join(output, "model.ckpt"))
-    tf.train.write_graph(graph, output, 'model.pbtxt')
+    tf.train.write_graph(graph, output, 'model.pbtxt', as_text=False)
     with open(os.path.join(output, "op_names.txt"), "w") as f:
         f.write('\n'.join(op_names))
 

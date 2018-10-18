@@ -14,7 +14,7 @@ def load_graph(frozen_graph_filename):
     with tf.Graph().as_default() as graph:
         # The name var will prefix every op/nodes in your graph
         # Since we load everything in a new graph, this is not needed
-        tf.train.import_meta_graph(graph_def)
+        tf.import_graph_def(graph_def)
     return graph
 
 
